@@ -22,9 +22,6 @@ BOOL CALLBACK AboutDlgProc(HWND hDlg,UINT message,WPARAM wParam,LPARAM lParam)
 	switch (message)
 	{
 	case WM_INITDIALOG:
-		player.Set(44100,1,16,1);
-		player.PreparePlay();
-		player.SetVolume(0xffff);
 		return TRUE;
 
 
@@ -39,16 +36,27 @@ BOOL CALLBACK AboutDlgProc(HWND hDlg,UINT message,WPARAM wParam,LPARAM lParam)
 			break;
 		case ID2:
 			{
-				player.FillSin(50);
-				player.mywaveOutWrite();
-				draw.SetSize(600,100);
-				draw.DrawPolyline(hDlg,16,player.GetpBuffer(),player.GetpwBuffer());
-			//player.draw();
-			break;
+				player.Set(44100,1,8,1);
+				player.SetVolume(0xffff);
+				player.FillSin(5000);
+				//player.draw();
+				break;
 			}
 		case ID3:
 			player.SaveWaveFile(TEXT("a.wav"));
 			break;
+		case ID4:
+			player.ReadWaveFile(TEXT("a.wav"));
+			break;
+		case ID5:
+			draw.SetSize(600,100);
+			draw.DrawPolyline(hDlg,8,player.GetpBuffer(),player.GetpwBuffer());
+			break;
+		case ID6:
+			
+				player.PreparePlay();
+				player.mywaveOutWrite();
+				break;
 		}
 		return TRUE;
 

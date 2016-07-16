@@ -24,15 +24,10 @@ private:
 		DWORD filesize;//4
 		char WAVEfmt[8];//8
 		DWORD formatsize;//4
-		WORD wFormatTag;//2
-		WORD nChannels;//2
-		DWORD nSamplesPerSec;//4
-		DWORD nAvgBytesPerSec;//4
-		WORD nBlockAlign;//2
-		DWORD wBitsPerSample;//4
+		WAVEFORMATEX waveformat;//18
 		char data[4];//4
 		DWORD size;//4
-	} wavefilehead;//44
+	} wavefilehead;
 
 	void FillWaveFileHead();
 
@@ -50,6 +45,9 @@ private:
 				return 0;
 			}
 		case MM_WOM_DONE:
+			{
+				mywaveOutWrite();
+			}
 			return 0;
 		case MM_WOM_CLOSE:
 			return 0 ;
@@ -76,6 +74,7 @@ public:
 	void Set(unsigned long irate,int ichannel,int iprecision,double len);
 	void PreparePlay();
 
+	void ReadWaveFile(char *filename);
 	void SaveWaveFile(char *filename);
 
 	void FillSquare(double iFreq);
@@ -142,17 +141,13 @@ PWAVEHDR MyPlayer::pWaveHdr=NULL;
 		out_buffer_size=(DWORD)(irate*len);
 		precision=iprecision;
 		rate=irate;
-	}
-	void MyPlayer::PreparePlay()
-	{
-		pWaveHdr=(PWAVEHDR)malloc(sizeof(WAVEHDR));
 		if (precision==8)
 			pBuffer=(PBYTE)malloc(out_buffer_size);
 		else
 			pwBuffer=(short *)malloc(out_buffer_size*sizeof(short));
 		int err=0;
-		if (!pWaveHdr)
-		{free(pWaveHdr);err=1;}
+		//if (!pWaveHdr)
+		//{free(pWaveHdr);err=1;}
 		if (precision==8)
 		{
 			if (!pBuffer)
@@ -169,6 +164,10 @@ PWAVEHDR MyPlayer::pWaveHdr=NULL;
 			MessageBeep (MB_ICONEXCLAMATION);
 			MessageBox (hwnd, TEXT ("Error allocating memory!"),TEXT(""), MB_ICONEXCLAMATION | MB_OK);
 		}
+	}
+	void MyPlayer::PreparePlay()
+	{
+		pWaveHdr=(PWAVEHDR)malloc(sizeof(WAVEHDR));
 
 		waveformat.wFormatTag      = WAVE_FORMAT_PCM;
 		waveformat.nChannels       = channel;
@@ -201,13 +200,43 @@ PWAVEHDR MyPlayer::pWaveHdr=NULL;
 			waveOutPrepareHeader (hWaveOut, pWaveHdr,sizeof (WAVEHDR));
 		}
 	}
+
+	void MyPlayer::ReadWaveFile(char *filename)
+	{
+		FILE *file;
+		if (_tfopen_s(&file,filename,TEXT("r+,ccs=UNICODE"))==0)//成功则为0
+		{
+			FillWaveFileHead();
+			fread(&wavefilehead,sizeof(WaveFileHead),1,file);
+			waveformat=wavefilehead.waveformat;
+			out_buffer_size=wavefilehead.size/waveformat.wBitsPerSample*8;
+
+			Set(waveformat.nSamplesPerSec,waveformat.nChannels,waveformat.wBitsPerSample/waveformat.nChannels,out_buffer_size/waveformat.nSamplesPerSec);
+
+			if (waveformat.wBitsPerSample/waveformat.nChannels==8)
+			{
+				pBuffer=(PBYTE)malloc(out_buffer_size);
+				fread(pBuffer,out_buffer_size,1,file);//sizeof(out_buffer_size*sizeof(WORD))
+			}
+			else
+			{
+				pwBuffer=(short *)malloc(out_buffer_size*sizeof(short));
+				fread(pwBuffer,out_buffer_size*sizeof(WORD),1,file);
+			}
+			_fcloseall();
+			MessageBox(NULL,TEXT("Success to read the file"),TEXT(""),0);
+		}
+		else
+			MessageBox(NULL,TEXT("Fail to open this file"),TEXT(""),0);
+	}
+
 	void MyPlayer::SaveWaveFile(char *filename)
 	{
 		FILE *file;
 		if (_tfopen_s(&file,filename,TEXT("w+,ccs=UNICODE"))==0)//成功则为0
 		{
 			FillWaveFileHead();
-			fwrite(&wavefilehead,46,1,file);
+			fwrite(&wavefilehead,sizeof(WaveFileHead),1,file);
 			if (precision==8)
 				fwrite(pBuffer,out_buffer_size,1,file);//sizeof(out_buffer_size*sizeof(WORD))
 			else
@@ -290,12 +319,7 @@ void MyPlayer::FillWaveFileHead()
 		wavefilehead.filesize=46-sizeof(DWORD)+out_buffer_size*precision/8;
 		strcpy(wavefilehead.WAVEfmt,"WAVEfmt ");
 		wavefilehead.formatsize=0x12;
-		wavefilehead.wFormatTag=WAVE_FORMAT_PCM;
-		wavefilehead.nChannels=channel;
-		wavefilehead.nSamplesPerSec=rate;
-		wavefilehead.nAvgBytesPerSec=channel*rate*precision/8;
-		wavefilehead.nBlockAlign=channel*precision/8;
-		wavefilehead.wBitsPerSample=channel*precision;
+		wavefilehead.waveformat=waveformat;
 		strcpy(wavefilehead.data,"data");
 		wavefilehead.size=out_buffer_size*channel*precision/8;
 	}
